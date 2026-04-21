@@ -11,10 +11,10 @@ import Review from './models/Review.js';
 
 dotenv.config();
 
-cloudinary.config({ 
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME, 
-  api_key: process.env.CLOUDINARY_API_KEY, 
-  api_secret: process.env.CLOUDINARY_API_SECRET 
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
 const storage = multer.memoryStorage();
@@ -42,15 +42,20 @@ mongoose.connect(process.env.MONGO_URI)
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
-  
+
   if (!token) return res.sendStatus(401);
-  
+
   jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
     if (err) return res.sendStatus(403);
     req.user = user;
     next();
   });
 };
+
+/* --- HEALTH CHECK --- */
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok' });
+});
 
 /* --- CONTACT ROUTE --- */
 app.post('/api/contact', async (req, res) => {
@@ -91,7 +96,7 @@ app.post('/api/contact', async (req, res) => {
 /* --- AUTH ROUTES --- */
 app.post('/api/login', (req, res) => {
   const { username, password } = req.body;
-  
+
   // Very simple auth using env vars for a lightweight single-user admin panel
   if (username === process.env.ADMIN_USERNAME && password === process.env.ADMIN_PASSWORD) {
     const token = jwt.sign({ username }, process.env.JWT_SECRET, { expiresIn: '24h' });
@@ -118,7 +123,7 @@ app.get('/api/projects', async (req, res) => {
 app.post('/api/projects', authenticateToken, upload.single('image'), async (req, res) => {
   try {
     let imageUrl = '';
-    
+
     if (req.file) {
       const uploadPromise = new Promise((resolve, reject) => {
         const stream = cloudinary.uploader.upload_stream(
@@ -210,17 +215,17 @@ app.post('/api/reviews', upload.single('image'), async (req, res) => {
       imageUrl = await uploadPromise;
     }
 
-    const review = new Review({ 
-      ...req.body, 
+    const review = new Review({
+      ...req.body,
       image: imageUrl,
-      approved: false 
+      approved: false
     });
-    
+
     await review.save();
     res.status(201).json(review);
-  } catch (error) { 
+  } catch (error) {
     console.error('Review submission error:', error);
-    res.status(400).json({ error: error.message }); 
+    res.status(400).json({ error: error.message });
   }
 });
 
@@ -241,4 +246,11 @@ app.delete('/api/reviews/:id', authenticateToken, async (req, res) => {
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+});
+app.get('/', (_, res) => {
+  res.status(200).send('Server is running!');
+});
+
+app.get('/health', (_, res) => {
+  res.status(200).json({ status: 'OK' });
 });
